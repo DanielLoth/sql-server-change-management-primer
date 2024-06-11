@@ -164,7 +164,7 @@ I've worked with two employers that make extensive use of the sqlpackage tool, a
 
 Anecdotally, one concern raised by those who I've known to dislike it is that the tool doesn't always work.
 
-In my experience, and with the benefit of hindsight and more experience, this is largely because the team at the time was using a Gitflow workflow and accumulating extensive amounts of change within a development branch.
+In my experience, and with the benefit of hindsight, this is largely because the team at the time was using a Gitflow workflow and accumulating extensive amounts of change within a development branch.
 
 The expectation, then, was that this cumlative change could all be released in one go, using a single execution of the sqlpackage tool.
 
