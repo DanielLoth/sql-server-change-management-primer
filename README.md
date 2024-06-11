@@ -77,8 +77,8 @@ For example, consider the following table DDL and note that it uses the `CAST` f
 
 ```sql
 create table TableWithCheckConstraint (
-	Id int primary key,
-	constraint CK check (1 = cast(1 as int))
+    Id int primary key,
+    constraint CK check (1 = cast(1 as int))
 );
 ```
 
@@ -86,8 +86,8 @@ When you query the `sys.check_constraints` metadata view, you'll notice that SQL
 
 ```sql
 select
-	name as ConstraintName,
-	definition as ConstraintDefinition
+    name as ConstraintName,
+    definition as ConstraintDefinition
 from sys.check_constraints;
 ```
 
@@ -103,8 +103,8 @@ For example, you can resolve the issue in this example as follows:
 
 ```sql
 create table TableWithCheckConstraint (
-	Id int primary key,
-	constraint CK check (1 = convert(int, 1))
+    Id int primary key,
+    constraint CK check (1 = convert(int, 1))
 );
 ```
 
@@ -116,8 +116,8 @@ Consider the following table DDL which creates a table with a `BIGINT` column. T
 
 ```sql
 create table TableWithDefaultConstraint (
-	Col1 bigint not null
-		constraint DF1 default 3000000000
+    Col1 bigint not null
+        constraint DF1 default 3000000000
 );
 ```
 
@@ -125,8 +125,8 @@ When you query the `sys.default_constraints` metadata view, you'll notice a subt
 
 ```sql
 select
-	name as ConstraintName,
-	definition as ConstraintDefinition
+    name as ConstraintName,
+    definition as ConstraintDefinition
 from sys.default_constraints;
 ```
 
@@ -142,8 +142,8 @@ For example:
 
 ```sql
 create table TableWithDefaultConstraint (
-	Col1 bigint not null
-		constraint DF1 default 3000000000. /* Note the period at the end */
+    Col1 bigint not null
+        constraint DF1 default 3000000000. /* Note the period at the end */
 );
 ```
 
@@ -151,8 +151,8 @@ Or alternatively:
 
 ```sql
 create table TableWithDefaultConstraint (
-	Col1 bigint not null
-		constraint DF1 default convert(bigint, '3000000000')
+    Col1 bigint not null
+        constraint DF1 default convert(bigint, '3000000000')
 );
 ```
 
