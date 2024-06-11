@@ -26,6 +26,8 @@ Please start a discussion first for the following:
 * [Complexities in sqlpackage](#complexities-in-sqlpackage)
   * [Dropped and recreated CHECK constraints](#dropped-and-recreated-check-constraints)
   * [Dropped and recreated DEFAULT constraints](#dropped-and-recreated-default-constraints)
+  * [Too much change within a single deployment](#too-much-change-within-a-single-deployment)
+  * [Locking and blocking](#locking-and-blocking)
 * [Manually changing data](#manually-changing-data)
 * [References](#references)
 
