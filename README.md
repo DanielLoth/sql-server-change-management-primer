@@ -174,7 +174,10 @@ The sqlpackage tool, based on the T-SQL it generates, is clearly designed to be 
 
 This is evidenced by the fact that, by default, it will carry out tasks which involve blocking access to the data.
 
-For example, the sqlpackage tool will happily perform table rebuilds in order to add a new column that is added between two existing columns when the `IgnoreColumnOrder` parameter has not been set to `true`.
+For example:
+* The SqlPackage tool will happily perform table rebuilds in order to add a new column that is added between two existing columns when the `IgnoreColumnOrder` parameter has not been set to `true`.
+  * This necessarily makes use of the `SERIALIZABLE` isolation level, and so is incompatible with other users of the database transacting against the data within the table for the duration of the table rebuild.
+* When creating `FOREIGN KEY` constraints, the SqlPackage tool will not use any kind of blocking-avoidance strategy. For example, the `LOCK_TIMEOUT` and `DEADLOCK_PRIORITY` settings.
 
 ## Manually changing data
 
