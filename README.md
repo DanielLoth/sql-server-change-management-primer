@@ -23,12 +23,11 @@ Please start a discussion first for the following:
   * [SqlPackage](#sqlpackage)
   * [SQLPROJ projects](#sqlproj-projects)
   * [DACPACs](#dacpacs)
-* [Complexities in sqlpackage](#complexities-in-sqlpackage)
-  * [Dropped and recreated CHECK constraints](#dropped-and-recreated-check-constraints)
-  * [Dropped and recreated DEFAULT constraints](#dropped-and-recreated-default-constraints)
-  * [Too much change within a single deployment](#too-much-change-within-a-single-deployment)
-  * [Locking and blocking](#locking-and-blocking)
-* [Manually changing data](#manually-changing-data)
+* [SqlPackage Cookbook](#sqlpackage-cookbook)
+  * [Fixing dropped and recreated CHECK constraints](#fixing-dropped-and-recreated-check-constraints)
+  * [Fixing dropped and recreated DEFAULT constraints](#fixing-dropped-and-recreated-default-constraints)
+  * [Avoiding blocking when creating FOREIGN KEY constraints on busy tables](#avoiding-blocking-when-creating-foreign-key-constraints-on-busy-tables)
+* [Notes on locking and blocking](#notes-on-locking-and-blocking)
 * [References](#references)
 
 
@@ -69,9 +68,9 @@ It also includes the aforementioned pre-deployment and post-deployment scripts.
 
 The DACPAC file is the key input for an execution of the sqlpackage tool.
 
-## Complexities in sqlpackage
+## SqlPackage cookbook
 
-### Dropped and recreated CHECK constraints
+### Fixing dropped and recreated CHECK constraints
 
 This happens because the definition of the constraint - as stored by SQL Server - varies from the way you've expressed that constraint within your code.
 
@@ -110,7 +109,7 @@ create table TableWithCheckConstraint (
 );
 ```
 
-### Dropped and recreated DEFAULT constraints
+### Fixing dropped and recreated DEFAULT constraints
 
 Just like CHECK constraints, SQL Server might elect to express the constraint in a manner that differs from how you've expressed it.
 
@@ -158,17 +157,32 @@ create table TableWithDefaultConstraint (
 );
 ```
 
-### Too much change within a single deployment
+### Avoiding blocking when creating FOREIGN KEY constraints on busy tables
 
-I've worked with two employers that make extensive use of the sqlpackage tool, and over time have found that people either love it or hate it.
+Consider the following scenarios, given parent table `T1` and referenced table `T2`:
 
-Anecdotally, one concern raised by those who I've known to dislike it is that the tool doesn't always work.
+* Both `T1` and `T2` are unused
+  * No issues here, as you won't block other database users while creating the constraint.
+* Table `T1` is used heavily, but `T2` is unused (i.e., perhaps you're adding `T2` to satisfy a new requirement)
+  * No issues here: If `T1` is `Sch-M` locked first, a subsequent `Sch-M` lock on `T2` will be acquired due to lack of contention.
+* Both `T1` and `T2` are used heavily (i.e., perhaps both tables are 6 months old and you've only just realised that a foreign key constraint should have been created, but was overlooked).
+  * Key issue: A `Sch-M` lock is acquired on one heavily used table, and subsequently held. But getting the `Sch-M` on the second heavily used table proves challenging. All the while, the first table remains `Sch-M` locked and users are unable to transact against that data.
 
-In my experience, and with the benefit of hindsight, this is largely because the team at the time was using a Gitflow workflow and accumulating extensive amounts of change within a development branch.
+The SqlPackage tool doesn't generate code that is cognisant of this kind of issue.
 
-The expectation, then, was that this cumlative change could all be released in one go, using a single execution of the sqlpackage tool.
+However, you can take the following steps to reduce the risk of this issue occurring.
 
-### Locking and blocking
+* Make use of a short `LOCK_TIMEOUT` and a low `DEADLOCK_PRIORITY` (set them to appropriate values within your pre-deployment script).
+* Structure any pre-deployment and post-deployment code so that it is idempotent (that is, if you run it multiple times then it yields the same outcome).
+* Retry the whole deployment process by re-executing the `sqlpackage.exe` tool. Either retrying until some deadline is reached (e.g.: if your first attempted deployment started at 10am, then try no further deployments after 10:10am) or some arbitrary maximum retry count is reached (e.g.: no further retries after we've already tried 5 times).
+
+This use of `LOCK_TIMEOUT` in particular will ensure that - should a `Sch-M` lock be picked up on one busy table - it is not held indefintely (or for an extended period of time) while subsequently trying to acquire a `Sch-M` lock on a second busy table.
+
+### Modifying an existing CHECK constraint
+
+TODO: Cover expand-and-contract so that there is never a period of time where a constraint is left unenforced.
+
+## Notes on locking and blocking
 
 The sqlpackage tool, based on the T-SQL it generates, is clearly designed to be executed during periods of little or no database usage (i.e., during a planned outage).
 
@@ -179,15 +193,9 @@ For example:
   * This necessarily makes use of the `SERIALIZABLE` isolation level, and so is incompatible with other users of the database transacting against the data within the table for the duration of the table rebuild.
 * When creating `FOREIGN KEY` constraints, the SqlPackage tool will not use any kind of blocking-avoidance strategy. For example, the `LOCK_TIMEOUT` and `DEADLOCK_PRIORITY` settings.
 
-## Manually changing data
+For a lot of companies this really isn't a problem. After all, many businesses are completely comfortable with downtime after their core business hours.
 
-> Sometimes you might to effect manual change. That is, a change executed by a human manually as opposed to a change executed within the context of your deployment pipeline.
->
-> This is hopefully a rare occurrence. But for some businesses it's perhaps not rare at all.
-
-### Changing small volumes of data
-
-### Changing large volumes of data
+For companies running software on a 24/7 basis, this makes it all the more challenging though.
 
 ## References
 
