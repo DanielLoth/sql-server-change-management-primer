@@ -27,6 +27,7 @@ Please start a discussion first for the following:
   * [Fixing dropped and recreated CHECK constraints](#fixing-dropped-and-recreated-check-constraints)
   * [Fixing dropped and recreated DEFAULT constraints](#fixing-dropped-and-recreated-default-constraints)
   * [Avoiding blocking when creating FOREIGN KEY constraints on busy tables](#avoiding-blocking-when-creating-foreign-key-constraints-on-busy-tables)
+  * [Modifying an existing CHECK constraint without risking integrity](#modifying-an-existing-check-constraint-without-risking-integrity)
 * [Notes on locking and blocking](#notes-on-locking-and-blocking)
 * [References](#references)
 
@@ -159,13 +160,14 @@ create table TableWithDefaultConstraint (
 
 ### Avoiding blocking when creating FOREIGN KEY constraints on busy tables
 
-Consider the following scenarios, given parent table `T1` and referenced table `T2`:
+Consider the following scenarios, given parent table `MyParentTable` (i.e., the parent table is the table that actually has the `FOREIGN KEY` constraint defined) and referenced table `MyReferencedTable`:
 
-* Both `T1` and `T2` are unused
+* Both `MyParentTable` and `MyReferencedTable` are unused
   * No issues here, as you won't block other database users while creating the constraint.
-* Table `T1` is used heavily, but `T2` is unused (i.e., perhaps you're adding `T2` to satisfy a new requirement)
-  * No issues here: If `T1` is `Sch-M` locked first, a subsequent `Sch-M` lock on `T2` will be acquired due to lack of contention.
-* Both `T1` and `T2` are used heavily (i.e., perhaps both tables are 6 months old and you've only just realised that a foreign key constraint should have been created, but was overlooked).
+* Table `MyReferencedTable` is used heavily, but `MyParentTable` is unused (i.e., perhaps you're adding `MyReferencedTable` to satisfy a new requirement)
+  * No issues here: If `MyReferencedTable` is `Sch-M` locked first, a subsequent `Sch-M` lock on `MyParentTable` will be acquired due to lack of contention.
+* Both `MyParentTable` and `MyReferencedTable` are used heavily
+  * Scenario: Both tables are 6 months old and you've only just realised that a foreign key constraint should have been created, but was overlooked. Now both tables are large and subject to contention.
   * Key issue: A `Sch-M` lock is acquired on one heavily used table, and subsequently held. But getting the `Sch-M` on the second heavily used table proves challenging. All the while, the first table remains `Sch-M` locked and users are unable to transact against that data.
 
 The SqlPackage tool doesn't generate code that is cognisant of this kind of issue.
@@ -174,11 +176,13 @@ However, you can take the following steps to reduce the risk of this issue occur
 
 * Make use of a short `LOCK_TIMEOUT` and a low `DEADLOCK_PRIORITY` (set them to appropriate values within your pre-deployment script).
 * Structure any pre-deployment and post-deployment code so that it is idempotent (that is, if you run it multiple times then it yields the same outcome).
-* Retry the whole deployment process by re-executing the `sqlpackage.exe` tool. Either retrying until some deadline is reached (e.g.: if your first attempted deployment started at 10am, then try no further deployments after 10:10am) or some arbitrary maximum retry count is reached (e.g.: no further retries after we've already tried 5 times).
+* Retry the whole deployment process by re-executing the `sqlpackage.exe` tool.
+  * Either retrying until some deadline is reached (e.g.: if your first attempted deployment started at 10am, then try no further deployments after 10:10am)
+  * Or retry until some arbitrary maximum retry count is reached (e.g.: no further retries after we've already tried 5 times).
 
 This use of `LOCK_TIMEOUT` in particular will ensure that - should a `Sch-M` lock be picked up on one busy table - it is not held indefintely (or for an extended period of time) while subsequently trying to acquire a `Sch-M` lock on a second busy table.
 
-### Modifying an existing CHECK constraint
+### Modifying an existing CHECK constraint without risking integrity
 
 TODO: Cover expand-and-contract so that there is never a period of time where a constraint is left unenforced.
 
